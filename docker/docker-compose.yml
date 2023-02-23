@@ -1,0 +1,16 @@
+version: '3.9'
+
+services:
+  maskdino:
+    build: .
+    runtime: nvidia
+    stdin_open: true
+    tty: true
+    ipc: host
+    volumes:
+      - ../output:/workspace/MaskDINO/output
+      - ../configs:/workspace/MaskDINO/configs
+      - ../models:/workspace/MaskDINO/models
+    ulimits:
+      memlock: -1
+      stack: 67108864
