@@ -4,14 +4,13 @@ import logging
 
 import numpy as np
 import torch
-from torch.nn import functional as F
-
 from detectron2.config import configurable
 from detectron2.data import MetadataCatalog
 from detectron2.data import detection_utils as utils
 from detectron2.data import transforms as T
 from detectron2.projects.point_rend import ColorAugSSDTransform
 from detectron2.structures import BitMasks, Instances
+from torch.nn import functional as F
 
 __all__ = ["MaskFormerSemanticDatasetMapper"]
 
@@ -171,6 +170,7 @@ class MaskFormerSemanticDatasetMapper:
                 masks.append(sem_seg_gt == class_id)
 
             if len(masks) == 0:
+                masks = BitMasks(torch.zeros((0, sem_seg_gt.shape[-2], sem_seg_gt.shape[-1])))
                 # Some image does not have annotation (all ignored)
                 instances.gt_masks = torch.zeros((0, sem_seg_gt.shape[-2], sem_seg_gt.shape[-1]))
             else:
