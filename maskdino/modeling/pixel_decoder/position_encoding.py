@@ -7,9 +7,13 @@
 Various positional encodings for the transformer.
 """
 import math
+import warnings
 
 import torch
 from torch import nn
+
+# to ignore floor division warning
+warnings.simplefilter('ignore')
 
 
 class PositionEmbeddingSine(nn.Module):
