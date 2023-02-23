@@ -63,9 +63,12 @@ Framework for Object Detection and Segmentation](https://arxiv.org/abs/2206.0277
 ***
 
 ## Installation
+Set `DATASET_PATH`, which includes datasets to be trained or evaluated.
 
-See [installation instructions](INSTALL.md).
-
+```bash
+DATASET_PATH=hoge
+docker-compose -f docker/docker-compose.yml run -v $DATASET_PATH:/workspace/MaskDINO/data --rm maskdino
+```
 
 
 ## Getting Started
@@ -262,6 +265,23 @@ following command first.
 
 You can also refer to [Getting Started with Detectron2](https://github.com/facebookresearch/detectron2/blob/master/GETTING_STARTED.md) for full usage.
 
+#### Train MaskDINO on custom dataset (semantic segmentation)
+```bash
+python train_net.py \
+    --num-gpus 1 \
+    --config path/to/config \
+    -dp path/to/data \
+    --stuff-classes hoge fuga piyo \
+    -ft \
+    MODEL.WEIGHTS models/maskdino_r50_50ep_100q_celoss_hid1024_3s_semantic_ade20k_48.7miou.pth
+```
+
+- `--num-gpus`: The number of GPUs
+- `--config`: Path to configuration file
+- `--dataset-path (-dp)`: Path to data root, which includes `images` and `annotations` directories. Currently, image and annotation suffixes must be `.png`.
+- `--stuff-classes (-sf)`: List of stuff class names, which will be registered to MetadataCatalog.
+- `--ignore-label (-il)`: Index of ignored label during evaluation. 255 by default.
+- `--finetune (-ft)`: Whether to train a model from a specified pretrained weight. If using this option, you have to specify `MODEL.WEIGHTS` for the pretrained weight.
 
 # More Usage
 
