@@ -7,69 +7,55 @@
 MaskDINO Training Script based on Mask2Former.
 """
 try:
-    from shapely.errors import ShapelyDeprecationWarning
     import warnings
+
+    from shapely.errors import ShapelyDeprecationWarning
     warnings.filterwarnings('ignore', category=ShapelyDeprecationWarning)
-except:
+except BaseException:
     pass
 
 import copy
 import itertools
 import logging
 import os
-
+import random
+import weakref
 from collections import OrderedDict
+from functools import partial
+from pathlib import Path
 from typing import Any, Dict, List, Set
 
-import torch
-
 import detectron2.utils.comm as comm
+import torch
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
-from detectron2.data import MetadataCatalog, build_detection_train_loader
-
-from detectron2.evaluation import (
-    CityscapesInstanceEvaluator,
-    CityscapesSemSegEvaluator,
-    COCOEvaluator,
-    COCOPanopticEvaluator,
-    DatasetEvaluators,
-    LVISEvaluator,
-    SemSegEvaluator,
-    verify_results,
-)
+from detectron2.data import (DatasetCatalog, MetadataCatalog,
+                             build_detection_train_loader)
+from detectron2.data.datasets import load_sem_seg
+from detectron2.engine import (AMPTrainer, DefaultTrainer, SimpleTrainer,
+                               create_ddp_model, default_argument_parser,
+                               default_setup, hooks, launch)
+from detectron2.evaluation import (CityscapesInstanceEvaluator,
+                                   CityscapesSemSegEvaluator, COCOEvaluator,
+                                   COCOPanopticEvaluator, DatasetEvaluators,
+                                   LVISEvaluator, SemSegEvaluator,
+                                   verify_results)
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
 
 # MaskDINO
-from maskdino import (
-    COCOInstanceNewBaselineDatasetMapper,
-    COCOPanopticNewBaselineDatasetMapper,
-    InstanceSegEvaluator,
-    MaskFormerSemanticDatasetMapper,
-    SemanticSegmentorWithTTA,
-    add_maskdino_config,
-    DetrDatasetMapper,
-)
-import random
-from detectron2.engine import (
-    DefaultTrainer,
-    default_argument_parser,
-    default_setup,
-    hooks,
-    launch,
-    create_ddp_model,
-    AMPTrainer,
-    SimpleTrainer
-)
-import weakref
+from maskdino import (COCOInstanceNewBaselineDatasetMapper,
+                      COCOPanopticNewBaselineDatasetMapper, DetrDatasetMapper,
+                      InstanceSegEvaluator, MaskFormerSemanticDatasetMapper,
+                      SemanticSegmentorWithTTA, add_maskdino_config)
 
 
 class Trainer(DefaultTrainer):
     """
     Extension of the Trainer class adapted to MaskFormer.
     """
+
     def __init__(self, cfg):
         super(DefaultTrainer, self).__init__()
         logger = logging.getLogger("detectron2")
@@ -360,20 +346,61 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
+    if args.finetune:
+        trainer.resume_or_load(resume=False)
+        return trainer.train()
+
     trainer.resume_or_load(resume=args.resume)
     return trainer.train()
+
+
+def register_dataset(dataset_path, split, gt_ext='png', img_ext='png', stuff_classes=None, ignore_label=0):
+    dataset_name = dataset_path.name + '_' + split
+    gt_root = dataset_path / 'annotations' / split
+    image_root = dataset_path / 'images' / split
+
+    def func():
+        return load_sem_seg(gt_root, image_root, gt_ext=gt_ext, image_ext=img_ext)
+
+    print(f'Register {dataset_name}')
+    DatasetCatalog.register(dataset_name, func)
+
+    meta = MetadataCatalog.get(dataset_name)
+    meta.set(
+        stuff_classes=stuff_classes,
+        image_root=image_root,
+        sem_seg_root=gt_root,
+        evaluator_type='sem_seg',
+        ignore_label=ignore_label,
+    )
 
 
 if __name__ == "__main__":
     parser = default_argument_parser()
     parser.add_argument('--eval_only', action='store_true')
     parser.add_argument('--EVAL_FLAG', type=int, default=1)
+    parser.add_argument('--dataset-path', '-dp', type=Path, help='Path to custom dataset.')
+    parser.add_argument('--stuff-classes', '-sc', nargs='*', type=str)
+    parser.add_argument('--ignore-label', '-il', default=255, type=int)
+    parser.add_argument('--finetune', '-ft', action='store_true')
     args = parser.parse_args()
+
     # random port
     port = random.randint(1000, 20000)
     args.dist_url = 'tcp://127.0.0.1:' + str(port)
     print("Command Line Args:", args)
     print("pwd:", os.getcwd())
+
+    # setup custom data
+    if args.dataset_path is not None:
+        for split in ['train', 'val']:
+            register_dataset(
+                args.dataset_path,
+                split,
+                stuff_classes=args.stuff_classes,
+                ignore_label=args.ignore_label,
+            )
+
     launch(
         main,
         args.num_gpus,
