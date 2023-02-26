@@ -78,6 +78,7 @@ def get_parser():
     parser.add_argument('--stuff-classes', '-sc', nargs='*', type=str)
     parser.add_argument('--ignore-label', '-il', default=255, type=int)
     parser.add_argument('--segmentation-threshold', '-st', default=0.5, type=float)
+    parser.add_argument('--alpha', default=0.5, type=float)
 
     return parser
 
@@ -148,7 +149,7 @@ if __name__ == "__main__":
             # use PIL, to be consistent with evaluation
             img = read_image(path, format="BGR")
             start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img, args.segmentation_threshold)
+            predictions, visualized_output = demo.run_on_image(img, args.segmentation_threshold, args.alpha)
             logger.info(
                 "{}: {} in {:.2f}s".format(
                     path,

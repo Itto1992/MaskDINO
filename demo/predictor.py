@@ -35,7 +35,7 @@ class VisualizationDemo(object):
         else:
             self.predictor = DefaultPredictor(cfg)
 
-    def run_on_image(self, image, segmentation_threshold=0.5):
+    def run_on_image(self, image, segmentation_threshold=0.5, alpha=0.9):
         """
         Args:
             image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -63,6 +63,7 @@ class VisualizationDemo(object):
                 vis_inp = torch.where(ignore, torch.full_like(vis_inp, num_classes), vis_inp)
                 vis_output = visualizer.draw_sem_seg(
                     vis_inp.to(self.cpu_device),
+                    alpha=alpha,
                 )
             if "instances" in predictions:
                 instances = predictions["instances"].to(self.cpu_device)
