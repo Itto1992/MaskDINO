@@ -4,28 +4,24 @@ import argparse
 import glob
 import multiprocessing as mp
 import os
-
-# fmt: off
 import sys
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
-# fmt: on
-
 import tempfile
 import time
 import warnings
+from pathlib import Path
 
 import cv2
 import numpy as np
 import tqdm
-
 from detectron2.config import get_cfg
+from detectron2.data import DatasetCatalog, MetadataCatalog
 from detectron2.data.detection_utils import read_image
 from detectron2.projects.deeplab import add_deeplab_config
 from detectron2.utils.logger import setup_logger
-
-from maskdino import add_maskdino_config
 from predictor import VisualizationDemo
 
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+from maskdino import add_maskdino_config
 
 # constants
 WINDOW_NAME = "mask2former demo"
@@ -76,6 +72,11 @@ def get_parser():
         default=[],
         nargs=argparse.REMAINDER,
     )
+
+    parser.add_argument('--dataset-path', '-dp', type=Path, help='Path to custom dataset.')
+    parser.add_argument('--stuff-classes', '-sc', nargs='*', type=str)
+    parser.add_argument('--ignore-label', '-il', default=255, type=int)
+
     return parser
 
 
@@ -96,12 +97,42 @@ def test_opencv_video_format(codec, file_ext):
         return False
 
 
+def register_dataset(dataset_path, split, gt_ext='png', img_ext='png', stuff_classes=None, ignore_label=0):
+    dataset_name = dataset_path.name + '_' + split
+    gt_root = dataset_path / 'annotations' / split
+    image_root = dataset_path / 'images' / split
+
+    def func():
+        return load_sem_seg(gt_root, image_root, gt_ext=gt_ext, image_ext=img_ext)
+
+    print(f'Register {dataset_name}')
+    DatasetCatalog.register(dataset_name, func)
+
+    meta = MetadataCatalog.get(dataset_name)
+    meta.set(
+        stuff_classes=stuff_classes,
+        image_root=image_root,
+        sem_seg_root=gt_root,
+        evaluator_type='sem_seg',
+        ignore_label=ignore_label,
+    )
+
+
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     args = get_parser().parse_args()
     setup_logger(name="fvcore")
     logger = setup_logger()
     logger.info("Arguments: " + str(args))
+
+    if args.dataset_path is not None:
+        for split in ['train', 'val']:
+            register_dataset(
+                args.dataset_path,
+                split,
+                stuff_classes=args.stuff_classes,
+                ignore_label=args.ignore_label,
+            )
 
     cfg = setup_cfg(args)
 
