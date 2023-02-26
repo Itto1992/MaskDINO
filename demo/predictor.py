@@ -7,7 +7,6 @@ from collections import deque
 
 import cv2
 import torch
-
 from detectron2.data import MetadataCatalog
 from detectron2.engine.defaults import DefaultPredictor
 from detectron2.utils.video_visualizer import VideoVisualizer
@@ -36,7 +35,7 @@ class VisualizationDemo(object):
         else:
             self.predictor = DefaultPredictor(cfg)
 
-    def run_on_image(self, image):
+    def run_on_image(self, image, segmentation_threshold=0.5):
         """
         Args:
             image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -57,8 +56,13 @@ class VisualizationDemo(object):
             )
         else:
             if "sem_seg" in predictions:
+                vis_inp = predictions["sem_seg"].sigmoid()
+                num_classes = vis_inp.shape[0]
+                ignore = (vis_inp < segmentation_threshold).sum(dim=0).to(bool)
+                vis_inp = vis_inp.argmax(dim=0)
+                vis_inp = torch.where(ignore, torch.full_like(vis_inp, num_classes), vis_inp)
                 vis_output = visualizer.draw_sem_seg(
-                    predictions["sem_seg"].argmax(dim=0).to(self.cpu_device)
+                    vis_inp.to(self.cpu_device),
                 )
             if "instances" in predictions:
                 instances = predictions["instances"].to(self.cpu_device)

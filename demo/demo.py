@@ -23,6 +23,7 @@ from predictor import VisualizationDemo
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from maskdino import add_maskdino_config
 
+
 # constants
 WINDOW_NAME = "mask2former demo"
 
@@ -76,6 +77,7 @@ def get_parser():
     parser.add_argument('--dataset-path', '-dp', type=Path, help='Path to custom dataset.')
     parser.add_argument('--stuff-classes', '-sc', nargs='*', type=str)
     parser.add_argument('--ignore-label', '-il', default=255, type=int)
+    parser.add_argument('--segmentation-threshold', '-st', default=0.5, type=float)
 
     return parser
 
@@ -146,7 +148,7 @@ if __name__ == "__main__":
             # use PIL, to be consistent with evaluation
             img = read_image(path, format="BGR")
             start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img)
+            predictions, visualized_output = demo.run_on_image(img, args.segmentation_threshold)
             logger.info(
                 "{}: {} in {:.2f}s".format(
                     path,
