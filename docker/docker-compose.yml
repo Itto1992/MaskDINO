@@ -8,9 +8,7 @@ services:
     tty: true
     ipc: host
     volumes:
-      - ../output:/workspace/MaskDINO/output
-      - ../configs:/workspace/MaskDINO/configs
-      - ../models:/workspace/MaskDINO/models
+      - ..:/workspace/MaskDINO
     ulimits:
       memlock: -1
       stack: 67108864
